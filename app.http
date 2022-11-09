@@ -1,0 +1,5 @@
+GET http://localhost:3000/state/
+###
+GET http://localhost:3000/state/stateId/
+###
+POST http://localhost:3000/districts/
