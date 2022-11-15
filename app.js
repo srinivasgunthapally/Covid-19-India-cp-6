@@ -1,12 +1,11 @@
 const express = require("express");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
-const path = require("path");
 
+const path = require("path");
 const databasePath = path.join(__dirname, "covid19India.db");
 
 const app = express();
-
 app.use(express.json());
 
 let database = null;
@@ -17,26 +16,24 @@ const initializeDbAndServer = async () => {
       filename: databasePath,
       driver: sqlite3.Database,
     });
-
     app.listen(3000, () =>
-      console.log("Server Running at http://localhost:3000/")
+      console.log("sever running at http://localhost:3000/")
     );
   } catch (error) {
-    console.log(`DB Error: ${error.message}`);
+    console.log(`DB error : ${error.message}`);
     process.exit(1);
   }
 };
 
 initializeDbAndServer();
 
-const convertStateDbObjectToResponseObject = (dbObject) => {
+const convertStateDbToResponse = (dbObject) => {
   return {
     stateId: dbObject.state_id,
     stateName: dbObject.state_name,
     population: dbObject.population,
   };
 };
-
 const convertDistrictDbObjectToResponseObject = (dbObject) => {
   return {
     districtId: dbObject.district_id,
@@ -49,33 +46,76 @@ const convertDistrictDbObjectToResponseObject = (dbObject) => {
   };
 };
 
+//API1
 app.get("/states/", async (request, response) => {
-  const getStatesQuery = `
-    SELECT
-      *
-    FROM
-      state;`;
-  const statesArray = await database.all(getStatesQuery);
-  response.send(
-    statesArray.map((eachState) =>
-      convertStateDbObjectToResponseObject(eachState)
-    )
-  );
+  const getStateQuery = `
+    SELECT * FROM state;`;
+  const states = await database.all(getStateQuery);
+  response.send(states.map((eachState) => convertStateDbToResponse(eachState)));
 });
 
+//API2
 app.get("/states/:stateId/", async (request, response) => {
   const { stateId } = request.params;
-  const getStateQuery = `
-    SELECT 
-      *
-    FROM 
-      state 
-    WHERE 
-      state_id = ${stateId};`;
-  const state = await database.get(getStateQuery);
-  response.send(convertStateDbObjectToResponseObject(state));
+  const getStateIdQuery = `
+    SELECT * FROM state WHERE state_id = ${stateId};`;
+  const states = await database.get(getStateIdQuery);
+  response.send(convertStateDbToResponse(states));
 });
 
+//API3
+app.post("/districts/", async (request, response) => {
+  const { stateId, districtName, cases, cured, active, deaths } = request.body;
+  const postQuery = `
+    INSERT INTO 
+        district  ( state_id ,district_name , cases, cured, active, deaths)
+    VALUES 
+        (${stateId},'${districtName}','${cases}', '${cured}',' ${active}', '${deaths}' );`;
+  const district = await database.run(postQuery);
+  response.send("District Successfully Added");
+});
+
+//API4
+
+app.get("/districts/:districtId/", async (request, response) => {
+  const { districtId } = request.params;
+  const getDistrictIdQuery = `
+        SELECT * FROM district WHERE district_id =  ${districtId};`;
+  const district = await database.get(getDistrictIdQuery);
+  response.send(convertDistrictDbObjectToResponseObject(district));
+});
+//API5
+app.delete("/districts/:districtId/", async (request, response) => {
+  const { districtId } = request.params;
+  const deleteQuery = `
+        DELETE FROM 
+            district 
+        WHERE 
+            district_id = ${districtId};`;
+  await database.run(deleteQuery);
+  response.send("District Removed");
+});
+
+//API6
+app.put("/districts/:districtId/", async (request, response) => {
+  const { districtId } = request.params;
+  const { districtName, stateId, cases, cured, active, deaths } = request.body;
+  const updateQuery = `
+        UPDATE 
+            district
+        SET 
+            district_name = '${districtName}', 
+            state_id = ${stateId}, 
+            cases = '${cases}', 
+            cured = '${cured}', 
+            active =' ${active}', 
+            deaths =' ${deaths}'
+        WHERE
+            district_id = ${districtId};`;
+  await database.run(updateQuery);
+  response.send("District Details Updated");
+});
+//API 7
 app.get("/states/:stateId/stats/", async (request, response) => {
   const { stateId } = request.params;
   const getStateStatsQuery = `
@@ -96,64 +136,7 @@ app.get("/states/:stateId/stats/", async (request, response) => {
     totalDeaths: stats["SUM(deaths)"],
   });
 });
-
-app.post("/districts/", async (request, response) => {
-  const { stateId, districtName, cases, cured, active, deaths } = request.body;
-  const postDistrictQuery = `
-  INSERT INTO
-    district (state_id, district_name, cases, cured, active, deaths)
-  VALUES
-    (${stateId}, '${districtName}', ${cases}, ${cured}, ${active}, ${deaths});`;
-  await database.run(postDistrictQuery);
-  response.send("District Successfully Added");
-});
-
-app.get("/districts/:districtId/", async (request, response) => {
-  const { districtId } = request.params;
-  const getDistrictsQuery = `
-    SELECT
-      *
-    FROM
-     district
-    WHERE
-      district_id = ${districtId};`;
-  const district = await database.get(getDistrictsQuery);
-  response.send(convertDistrictDbObjectToResponseObject(district));
-});
-
-app.delete("/districts/:districtId/", async (request, response) => {
-  const { districtId } = request.params;
-  const deleteDistrictQuery = `
-  DELETE FROM
-    district
-  WHERE
-    district_id = ${districtId} 
-  `;
-  await database.run(deleteDistrictQuery);
-  response.send("District Removed");
-});
-
-app.put("/districts/:districtId/", async (request, response) => {
-  const { districtId } = request.params;
-  const { districtName, stateId, cases, cured, active, deaths } = request.body;
-  const updateDistrictQuery = `
-  UPDATE
-    district
-  SET
-    district_name = '${districtName}',
-    state_id = ${stateId},
-    cases = ${cases},
-    cured = ${cured},
-    active = ${active}, 
-    deaths = ${deaths}
-  WHERE
-    district_id = ${districtId};
-  `;
-
-  await database.run(updateDistrictQuery);
-  response.send("District Details Updated");
-});
-
+//API8
 app.get("/districts/:districtId/details/", async (request, response) => {
   const { districtId } = request.params;
   const getStateNameQuery = `
@@ -168,5 +151,4 @@ app.get("/districts/:districtId/details/", async (request, response) => {
   const state = await database.get(getStateNameQuery);
   response.send({ stateName: state.state_name });
 });
-
 module.exports = app;
